@@ -49,12 +49,12 @@ direction_die_faces = ["+", "+", "+", "-", "-", "-"]
 
 
 # Global simulation settings
-num_of_games = 5
+num_of_games = 3
 num_of_rounds = 7
 final_scores = []
 rounds_ended = []
 cards_drawn = []
-
+discard_pile = []
 tony_risk_aversion_modifier = 0.5
 
 for game_num in range(num_of_games):
@@ -80,6 +80,8 @@ for game_num in range(num_of_games):
         "Complex": 4,
         "Special": 5
     }
+    
+    discard_pile = []
 
     # Shuffle the cards before starting the simulation
     cards = cards.sample(frac=1).reset_index(drop=True)
@@ -110,12 +112,22 @@ for game_num in range(num_of_games):
             # Next card in round.
             j+=1
             
-            # First card cannot be Special or COmplex
+            # First card cannot be Special or Complex
             if j==1 and (card['Trick Type'] == 'Special' or card['Trick Type'] == 'Complex'):
                 print(f'{card["Trick Type"]} card was drawn in iteration {j}')
-                # This card doesn't count so reset card counter to zero
+                # This card doesn't count so reset card counter to zero and add card to discard pile
                 j = 0
+                discard_pile.append(card)
+                print(f'First card Special or Complex, added to Discard pile. Currnet discard pile size is {len(discard_pile)}')
                 continue
+            elif j==2 and card['Trick Type'] == 'Special':
+                print(f'{card["Trick Type"]} card was drawn in iteration {j}')
+                # This card doesn't count so reset card counter to 1 and add card to discard pile
+                j = 1
+                discard_pile.append(card)
+                print(f'First card Special or Complex, added to Discard pile. Currnet discard pile size is {len(discard_pile)}')
+                continue
+
             
             
             print(f"Total card index in deck: {i}")
@@ -139,23 +151,19 @@ for game_num in range(num_of_games):
             combo_score += trick_scores[card["Trick Type"]] * tony_bot[card["Skill Upgrade"]]
             
             # Check what is the next card's back
-            # To refer to the next card, you can use 'i+1' as the index to access the next row
-            # But first, you need to check if 'i+1' is a valid index to avoid an IndexError
             next_card = None
-            
             if i < len(cards) - 1:
                 next_card = cards.iloc[i+1]
-            # Now 'next_card' holds the data for the next card, and you can refer to its columns like 'next_card["Column Name"]'
-            print(f"Next card: {next_card['Card Number']}")
+            print(f"The next card is: {next_card['Card Number']}")
             
             if next_card is None:
                 print(f"No next card")
                 cards_drawn.append(j)
                 break
             
-            # gain flame tokens
+            # Gain flame tokens from the back of the next card
             tony_bot["flame_tokens"] += next_card["Flame Tokens (Back)"]
-            print(f"Flame token gained: {next_card['Flame Tokens (Back)']}")
+            print(f"Flame tokens gained: {next_card['Flame Tokens (Back)']}")
             
             # Roll balance die
             balace_die_results = roll_dice(j, balance_die_faces)
@@ -178,17 +186,30 @@ for game_num in range(num_of_games):
 
             # Check if Tony Bot busts
             if tony_bot["balance"] <= -4 or tony_bot["balance"] >= 4:
+            
+                #Half their combo score and flame tokens rounded down
                 tony_bot["flame_tokens"] //=2
                 combo_score //=2
                 print(f"Tony busted after {i+1} cards total, including skipped, and {j} cards in this round")
-                current_card_index = i +1
+                
+                # put last card in the discard pile
+                discard_pile.append(card)
+                print(f'Currnet discard pile size is {len(discard_pile)}')
+                
+                current_card_index = i + 1
                 cards_drawn.append(j)
                 break
             
             # Break after maximum of 6 cards played 
             if j==6:
+                
+                # put last card in the discard pile
+                discard_pile.append(card)
+                print(f'Currnet discard pile size is {len(discard_pile)}')
+                
                 cards_drawn.append(j)
                 break
+            
             # Check if Tony Bot lands the combo using next_card
             if next_card["Combo Continuation (Back)"] == "Land":
                 if (j == 1 and (card["Trick Type"] in ("Simple", "Moderate"))):
@@ -196,6 +217,10 @@ for game_num in range(num_of_games):
                 elif random.random() <= tony_bot["risk_aversion"]:
                     current_card_index = i + 1
                     print(f"Tony chose to land due to high risk aversion after {j} cards in this round")
+                    
+                    discard_pile.append(card)
+                    print(f'Currnet discard pile size is {len(discard_pile)}')
+                    
                     cards_drawn.append(j)
                     break
 
